@@ -1,0 +1,40 @@
+<link rel="import" href="bower_components/polymer/polymer.html">
+<link rel="import" href="bower_components/core-ajax/core-ajax.html">
+
+<polymer-element name="video-list">
+  <template>
+    <style>
+    :host {
+      display: block;
+      position: relative;
+      background-color: white;
+      padding: 20px;
+      width: 100%;
+      font-size: 1.2rem;
+      font-weight: 300;
+    }
+    </style>
+
+    <core-ajax
+      auto
+      url="newest.json"
+      handleAs="json"
+      response="{{videos}}"
+    ></core-ajax>
+
+    <ul>
+      <template repeat="{{v in videos}}">
+        <p>
+          <a href="go?id={{v.id}}" target="_blank">
+            {{v.title}}
+          </a>
+        </p>
+        <img src="{{v.image}}" />
+      </template>
+    </ul>
+
+  </template>
+  <script>
+    Polymer({});
+  </script>
+</polymer-element>
