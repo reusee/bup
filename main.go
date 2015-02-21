@@ -179,7 +179,7 @@ func main() {
 		w.Write(bs)
 	})
 
-	http.HandleFunc("/latest.json", func(w http.ResponseWriter, req *http.Request) {
+	http.HandleFunc("/recently.json", func(w http.ResponseWriter, req *http.Request) {
 		videos := []Video{}
 		err := db.Select(&videos, `SELECT id, title, image FROM video 
 			WHERE last_visit IS NOT NULL

@@ -1,8 +1,10 @@
 <link rel="import" href="bower_components/polymer/polymer.html">
 <link rel="import" href="bower_components/core-ajax/core-ajax.html">
+<link rel="import" href="bower_components/paper-button/paper-button.html">
 
-<polymer-element name="video-list">
+<polymer-element name="video-list" attributes="url cat">
   <template>
+
     <style>
     :host {
       display: block;
@@ -16,25 +18,37 @@
     </style>
 
     <core-ajax
+      id="ajax"
       auto
-      url="newest.json"
+      url="{{url}}"
       handleAs="json"
       response="{{videos}}"
     ></core-ajax>
 
+    <h3>{{cat}}</h3>
     <ul>
       <template repeat="{{v in videos}}">
         <p>
           <a href="go?id={{v.id}}" target="_blank">
             {{v.title}}
           </a>
+          <paper-button on-click="{{mark}}" video-id="{{v.id}}">Mark</paper-button>
         </p>
         <img src="{{v.image}}" />
       </template>
     </ul>
 
   </template>
+
   <script>
-    Polymer({});
+    Polymer({
+      mark: function(event, detail, sender) {
+        console.log(sender);
+      },
+      flush: function() {
+        this.$.ajax.go();
+      }
+    });
   </script>
+
 </polymer-element>
