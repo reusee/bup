@@ -1,5 +1,6 @@
 <link rel="import" href="bower_components/polymer/polymer.html">
 <link rel="import" href="bower_components/core-ajax/core-ajax.html">
+<link rel="import" href="bower_components/core-ajax/core-xhr.html">
 <link rel="import" href="bower_components/paper-button/paper-button.html">
 
 <polymer-element name="video-list" attributes="url cat">
@@ -24,6 +25,7 @@
       handleAs="json"
       response="{{videos}}"
     ></core-ajax>
+    <core-xhr id="xhr"></core-xhr>
 
     <h3>{{cat}}</h3>
     <ul>
@@ -43,7 +45,10 @@
   <script>
     Polymer({
       mark: function(event, detail, sender) {
-        console.log(sender);
+        this.$.xhr.request({
+          url: "go?id=" + sender.getAttribute('video-id')
+        });
+        console.log(sender.getAttribute('video-id'));
       },
       flush: function() {
         this.$.ajax.go();
