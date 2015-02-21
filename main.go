@@ -7,9 +7,13 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	_ "net/http/pprof"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/jackc/pgx"
@@ -60,38 +64,36 @@ func main() {
 		return doc
 	}
 
-getMaxPage:
-	doc := bytesToDoc(get("http://space.bilibili.com/19415/follow.html?page=1"))
-	maxPage := doc.Find("ul.page li").Length()
-	if maxPage == 0 {
-		pt("retry get max page\n")
-		goto getMaxPage
-	}
-	pt("max page %d\n", maxPage)
-	users := []string{}
-	collectUser := func(url string) {
-	getDoc:
-		doc := bytesToDoc(get(url))
-		entries := doc.Find("div.fanslist ul li div.t a[card]")
-		if entries.Length() == 0 {
-			pt("retry get doc %s\n", url)
-			goto getDoc
+	collectFollowers := func() []string {
+
+	getMaxPage:
+		doc := bytesToDoc(get("http://space.bilibili.com/19415/follow.html?page=1"))
+		maxPage := doc.Find("ul.page li").Length()
+		if maxPage == 0 {
+			goto getMaxPage
 		}
-		entries.Each(func(n int, se *goquery.Selection) {
-			href, ok := se.Attr("href")
-			if !ok {
-				log.Fatal("invalid entry")
+		users := []string{}
+		collectUser := func(url string) {
+		getDoc:
+			doc := bytesToDoc(get(url))
+			entries := doc.Find("div.fanslist ul li div.t a[card]")
+			if entries.Length() == 0 {
+				goto getDoc
 			}
-			uid := href[strings.LastIndex(href, "/")+1:]
-			pt("%s ", uid)
-			users = append(users, uid)
-		})
+			entries.Each(func(n int, se *goquery.Selection) {
+				href, ok := se.Attr("href")
+				if !ok {
+					log.Fatal("invalid entry")
+				}
+				uid := href[strings.LastIndex(href, "/")+1:]
+				users = append(users, uid)
+			})
+		}
+		for i := 1; i <= maxPage; i++ {
+			collectUser(sp("http://space.bilibili.com/19415/follow.html?page=%d", i))
+		}
+		return users
 	}
-	for i := 1; i <= maxPage; i++ {
-		collectUser(sp("http://space.bilibili.com/19415/follow.html?page=%d", i))
-	}
-	pt("\n")
-	pt("following %d users\n", len(users))
 
 	collectVideo := func(uid string, page int) (int, int) {
 		url := sp("http://space.bilibili.com/space?uid=%s&page=%d", uid, page)
@@ -119,12 +121,9 @@ getMaxPage:
 			if err != nil {
 				if err.(pgx.PgError).Code == "23505" { // dup
 					dup++
-					//pt("dup %s %d\n", title, id)
 				} else {
 					log.Fatal(err)
 				}
-			} else {
-				//pt("added %s %d\n", title, id)
 			}
 			count++
 		})
@@ -133,6 +132,7 @@ getMaxPage:
 
 	collect := func() {
 		t0 := time.Now()
+		users := collectFollowers()
 		for _, uid := range users {
 			page := 1
 			totalDup := 0
@@ -154,11 +154,18 @@ getMaxPage:
 	go func() {
 		for {
 			collect()
-			time.Sleep(time.Minute * 10)
+			time.Sleep(time.Minute * 5)
 		}
 	}()
 
-	http.Handle("/", http.FileServer(http.Dir("web")))
+	root := "./web"
+	if len(os.Args) > 1 {
+		root = os.Args[1]
+	}
+	root, err = filepath.Abs(root)
+	checkErr("get web root dir", err)
+	pt("web root %s\n", root)
+	http.Handle("/", http.FileServer(http.Dir(root)))
 
 	http.HandleFunc("/newest.json", func(w http.ResponseWriter, req *http.Request) {
 		videos := []Video{}
@@ -184,7 +191,6 @@ getMaxPage:
 
 	http.HandleFunc("/go", func(w http.ResponseWriter, req *http.Request) {
 		idStr := req.FormValue("id")
-		pt("clicked %s\n", idStr)
 		id, err := strconv.Atoi(idStr)
 		checkErr("parse id", err)
 		db.MustExec(`UPDATE video SET 
