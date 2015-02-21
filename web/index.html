@@ -13,7 +13,7 @@
     <div>
       <paper-button on-click="{{flush}}">Flush</paper-button>
     </div>
-    <core-header-panel>
+    <core-header-panel id="header">
       <div horizontal layout>
         <video-list id="newest" url="newest.json" cat="Newest"></video-list>
         <video-list id="recently" url="recently.json" cat="Recently"></video-list>
@@ -25,6 +25,7 @@
 function flush() {
   document.querySelector('#newest').flush()
   document.querySelector('#recently').flush()
+  this.$.header.scroller.scrollTop = 0;
 }
 addEventListener('template-bound', function(e) {
   e.target.flush = flush;
