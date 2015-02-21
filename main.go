@@ -16,6 +16,7 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/bradfitz/http2"
 	"github.com/jackc/pgx"
 	_ "github.com/jackc/pgx/stdlib"
 	"github.com/jmoiron/sqlx"
@@ -201,7 +202,11 @@ func main() {
 	})
 
 	pt("starting http server\n")
-	err = http.ListenAndServe(":19870", nil)
+	server := http.Server{
+		Addr: ":19870",
+	}
+	http2.ConfigureServer(&server, nil)
+	err = server.ListenAndServe()
 	checkErr("start http server", err)
 }
 
