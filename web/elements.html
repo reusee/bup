@@ -3,6 +3,31 @@
 <link rel="import" href="bower_components/core-ajax/core-xhr.html">
 <link rel="import" href="bower_components/paper-button/paper-button.html">
 
+<polymer-element name="video-entry" attributes="vid image vtitle">
+  <template>
+    <p>
+      <paper-button on-click="{{mark}}" video-id="{{vid}}">Mark</paper-button>
+      <a href="go?id={{vid}}" target="_blank">{{vtitle}}</a>
+    </p>
+    <img src="{{image}}" />
+  </template>
+  <script>
+  (function() {
+    var xhr = document.createElement('core-xhr');
+    function mark(event, detail, sender) {
+      xhr.request({
+        url: "go?id=" + sender.getAttribute('video-id')
+      });
+      this.remove();
+      //TODO add to recently
+    }
+    Polymer({
+      mark: mark
+    });
+  })();
+  </script>
+</polymer>
+
 <polymer-element name="video-list" attributes="url cat">
   <template>
 
@@ -28,31 +53,16 @@
       handleAs="json"
       response="{{videos}}"
     ></core-ajax>
-    <core-xhr id="xhr"></core-xhr>
 
     <h3>{{cat}}</h3>
-    <ul>
-      <template repeat="{{v in videos}}">
-        <p>
-          <paper-button on-click="{{mark}}" video-id="{{v.id}}">Mark</paper-button>
-          <a href="go?id={{v.id}}" target="_blank">
-            {{v.title}}
-          </a>
-        </p>
-        <img src="{{v.image}}" />
-      </template>
-    </ul>
+    <template repeat="{{v in videos}}">
+      <video-entry vid="{{v.id}}" image="{{v.image}}" vtitle="{{v.title}}"></video-entry>
+    </template>
 
   </template>
 
   <script>
     Polymer({
-      mark: function(event, detail, sender) {
-        this.$.xhr.request({
-          url: "go?id=" + sender.getAttribute('video-id')
-        });
-        console.log(sender.getAttribute('video-id'));
-      },
       flush: function() {
         this.$.ajax.go();
       }

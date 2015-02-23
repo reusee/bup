@@ -3,6 +3,7 @@
   <head>
     <script src="bower_components/webcomponentsjs/webcomponents.min.js"></script>
     <link rel="import" href="bower_components/core-header-panel/core-header-panel.html">
+    <link rel="import" href="bower_components/core-a11y-keys/core-a11y-keys.html">
     <link rel="import" href="bower_components/paper-button/paper-button.html">
     <link rel="stylesheet" href="style.css">
     <link rel="import" href="elements.html">
@@ -10,6 +11,7 @@
   <body unresolved>
 
     <template is="auto-binding">
+    <core-a11y-keys keys="f" on-keys-pressed="{{flush}}"></core-a11y-keys>
     <div>
       <paper-button on-click="{{flush}}">Flush</paper-button>
     </div>
@@ -23,6 +25,7 @@
 
     <script>
 function flush() {
+  console.log('flush');
   document.querySelector('#newest').flush()
   document.querySelector('#recently').flush()
   this.$.header.scroller.scrollTop = 0;

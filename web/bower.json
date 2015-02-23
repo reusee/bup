@@ -19,6 +19,8 @@
     "core-header-panel": "Polymer/core-header-panel#~0.5.5",
     "core-toolbar": "Polymer/core-toolbar#~0.5.5",
     "paper-button": "Polymer/paper-button#~0.5.5",
-    "paper-tabs": "Polymer/paper-tabs#~0.5.5"
+    "paper-tabs": "Polymer/paper-tabs#~0.5.5",
+    "core-a11y-keys": "Polymer/core-a11y-keys#~0.5.5",
+    "core-signals": "Polymer/core-signals#~0.5.5"
   }
 }
