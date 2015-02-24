@@ -48,7 +48,7 @@ func main() {
 	//db.MustExec(schema)
 
 	client := http.Client{
-		Timeout: time.Second * 8,
+		Timeout: time.Second * 16,
 	}
 	get := func(url string) []byte {
 		resp, err := client.Get(url)
