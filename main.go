@@ -51,11 +51,20 @@ func main() {
 		Timeout: time.Second * 16,
 	}
 	get := func(url string) []byte {
+		retryCount := 3
+	retry:
 		resp, err := client.Get(url)
 		checkErr(sp("get %s", url), err)
 		defer resp.Body.Close()
 		content, err := ioutil.ReadAll(resp.Body)
-		checkErr(sp("read %s", url), err)
+		if err != nil {
+			if retryCount > 0 {
+				retryCount--
+				goto retry
+			} else {
+				checkErr(sp("read %s", url), err)
+			}
+		}
 		return content
 	}
 
