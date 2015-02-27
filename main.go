@@ -47,12 +47,12 @@ func main() {
 	checkErr("ping database", err)
 	//db.MustExec(schema)
 
-	client := http.Client{
-		Timeout: time.Second * 16,
-	}
 	get := func(url string) []byte {
-		retryCount := 3
+		retryCount := 8
 	retry:
+		client := http.Client{
+			Timeout: time.Second * 16,
+		}
 		resp, err := client.Get(url)
 		checkErr(sp("get %s", url), err)
 		defer resp.Body.Close()
@@ -60,6 +60,7 @@ func main() {
 		if err != nil {
 			if retryCount > 0 {
 				retryCount--
+				time.Sleep(time.Second * 3)
 				goto retry
 			} else {
 				checkErr(sp("read %s", url), err)
