@@ -37,7 +37,7 @@ CREATE TABLE video (
 func main() {
 	checkErr := func(msg string, err error) {
 		if err != nil {
-			log.Fatalf("%s error %v", msg, err)
+			panic(sp("%s error: %v", msg, err))
 		}
 	}
 
@@ -164,7 +164,10 @@ func main() {
 
 	go func() {
 		for {
-			collect()
+			func() {
+				defer recover()
+				collect()
+			}()
 			time.Sleep(time.Minute * 5)
 		}
 	}()
