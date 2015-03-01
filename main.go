@@ -53,8 +53,17 @@ func main() {
 		client := http.Client{
 			Timeout: time.Second * 16,
 		}
+		pt("get %s\n", url)
 		resp, err := client.Get(url)
-		checkErr(sp("get %s", url), err)
+		if err != nil {
+			if retryCount > 0 {
+				retryCount--
+				time.Sleep(time.Second * 3)
+				goto retry
+			} else {
+				checkErr(sp("get %s", url), err)
+			}
+		}
 		defer resp.Body.Close()
 		content, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
