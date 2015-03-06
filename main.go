@@ -1,5 +1,7 @@
 package main
 
+//go:generate myccg -output sort.go sorter Video VideoSorter
+
 import (
 	"bytes"
 	"encoding/json"
@@ -27,13 +29,6 @@ var (
 	sp = fmt.Sprintf
 )
 
-var schema = `
-CREATE TABLE video (
-	id int primary key,
-	title text
-);
-`
-
 func main() {
 	checkErr := func(msg string, err error) {
 		if err != nil {
@@ -45,7 +40,6 @@ func main() {
 	checkErr("connect to psql", err)
 	err = db.Ping()
 	checkErr("ping database", err)
-	//db.MustExec(schema)
 
 	get := func(url string) []byte {
 		retryCount := 8
@@ -136,8 +130,8 @@ func main() {
 			if !ok {
 				log.Fatal("no image")
 			}
-			_, err = db.Exec(`INSERT INTO video (id, title, image, added) 
-				VALUES ($1, $2, $3, $4)`, id, title, image, time.Now().Unix())
+			_, err = db.Exec(`INSERT INTO video (id, title, image, added, uid) 
+				VALUES ($1, $2, $3, $4, $5)`, id, title, image, time.Now().Unix(), uid)
 			if err != nil {
 				if err.(pgx.PgError).Code == "23505" { // dup
 					dup++
@@ -237,12 +231,4 @@ type Video struct {
 	Id    int    `db:"id" json:"id"`
 	View  int    `db:"view" json:"view"`
 	Image string `db:"image" json:"image"`
-}
-
-type VideoSorter []Video
-
-func (s VideoSorter) Len() int      { return len(s) }
-func (s VideoSorter) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
-func (s VideoSorter) Less(i, j int) bool {
-	return s[i].Id > s[j].Id
 }
