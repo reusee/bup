@@ -1,7 +1,5 @@
 package main
 
-//go:generate myccg -output sort.go sorter Video VideoSorter
-
 import (
 	"bytes"
 	"encoding/json"
