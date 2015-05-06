@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -23,11 +24,19 @@ import (
 )
 
 var (
-	pt = fmt.Printf
-	sp = fmt.Sprintf
+	pt          = fmt.Printf
+	sp          = fmt.Sprintf
+	logFilePath = flag.String("log", "", "log file path")
 )
 
 func main() {
+	flag.Parse()
+	defer func() {
+		if p := recover(); p != nil && *logFilePath != "" {
+			ioutil.WriteFile(*logFilePath, []byte(fmt.Sprintf("%v", p)), 0644)
+		}
+	}()
+
 	checkErr := func(msg string, err error) {
 		if err != nil {
 			panic(sp("%s error: %v", msg, err))
