@@ -151,7 +151,7 @@ func main() {
 		return count, dup
 	}
 
-	collect := func() {
+	collectFollowed := func() {
 		t0 := time.Now()
 		users := collectFollowers()
 		for _, uid := range users {
@@ -172,11 +172,52 @@ func main() {
 		pt("collected in %v\n", time.Now().Sub(t0))
 	}
 
+	collectHottest := func() {
+		for _, category := range []string{
+			"bagumi_offical_1",
+			"music-coordinate-1",
+			"game-video-1",
+		} {
+			url := sp("http://www.bilibili.com/video/%s.html#!order=hot&page=1", category)
+			doc := bytesToDoc(get(url))
+			entries := doc.Find("ul.vd-list li")
+			entries.Each(func(i int, se *goquery.Selection) {
+				titleSe := se.Find("a.title")
+				title := titleSe.Text()
+				href, ok := titleSe.Attr("href")
+				if !ok || len(title) == 0 {
+					log.Fatalf("invalid entry in %s # %d", url, i)
+				}
+				idStr := href[strings.LastIndex(href, "av")+2:]
+				idStr = idStr[:len(idStr)-1]
+				id, err := strconv.Atoi(idStr)
+				if err != nil {
+					log.Fatalf("invalid entry in %s # %d", url, i)
+				}
+				imgSe := se.Find("a img")
+				image, ok := imgSe.Attr("src")
+				if !ok {
+					log.Fatalf("invalid entry in %s # %d", url, i)
+				}
+				//pt("%d %s %s\n", id, title, image)
+				_, err = db.Exec(`INSERT INTO video (id, title, image, added)
+					VALUES ($1, $2, $3, $4)`, id, title, image, time.Now().Unix())
+				if err != nil {
+					if err.(pgx.PgError).Code == "23505" { // dup
+					} else {
+						log.Fatal(err)
+					}
+				}
+			})
+		}
+	}
+
 	go func() {
 		for {
 			func() {
 				defer recover()
-				collect()
+				collectHottest()
+				collectFollowed()
 			}()
 			time.Sleep(time.Minute * 5)
 		}
