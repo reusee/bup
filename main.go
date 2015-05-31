@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -104,7 +103,7 @@ func main() {
 			entries.Each(func(n int, se *goquery.Selection) {
 				href, ok := se.Attr("href")
 				if !ok {
-					log.Fatal("invalid entry")
+					panic("invalid entry")
 				}
 				uid := href[strings.LastIndex(href, "/")+1:]
 				users = append(users, uid)
@@ -127,7 +126,7 @@ func main() {
 			title := titleSe.Text()
 			href, ok := titleSe.Attr("href")
 			if !ok || len(title) == 0 {
-				log.Fatal("invalid entry")
+				panic("invalid entry")
 			}
 			idStr := href[strings.LastIndex(href, "av")+2:]
 			idStr = idStr[:len(idStr)-1]
@@ -135,7 +134,7 @@ func main() {
 			imgSe := se.Find("a img")
 			image, ok := imgSe.Attr("src")
 			if !ok {
-				log.Fatal("no image")
+				panic("no image")
 			}
 			_, err = db.Exec(`INSERT INTO video (id, title, image, added, uid) 
 				VALUES ($1, $2, $3, $4, $5)`, id, title, image, time.Now().Unix(), uid)
@@ -143,7 +142,7 @@ func main() {
 				if err.(pgx.PgError).Code == "23505" { // dup
 					dup++
 				} else {
-					log.Fatal(err)
+					panic(err)
 				}
 			}
 			count++
@@ -173,12 +172,17 @@ func main() {
 	}
 
 	collectHottest := func() {
-		for _, category := range []string{
-			"bagumi_offical_1",
-			"music-coordinate-1",
-			"game-video-1",
-		} {
-			url := sp("http://www.bilibili.com/video/%s.html#!order=hot&page=1", category)
+		urls := []string{
+			"http://www.bilibili.com/video/bagumi_offical_1.html#!order=hot&page=1", // 官方延伸所有新投稿
+		}
+		end := time.Now()
+		start := end.AddDate(0, 0, -7)
+		rangeStr := sp("%4d-%02d-%02d~%4d-%02d-%02d", start.Year(), start.Month(), start.Day(),
+			end.Year(), end.Month(), end.Day())
+		urls = append(urls, sp("http://www.bilibili.com/list/damku-29-1-%s.html", rangeStr)) // 三次元音乐弹幕排序
+		urls = append(urls, sp("http://www.bilibili.com/list/damku-17-1-%s.html", rangeStr)) // 单机联机弹幕排序
+		urls = append(urls, sp("http://www.bilibili.com/list/damku-37-1-%s.html", rangeStr)) // 纪录片弹幕排序
+		for _, url := range urls {
 			doc := bytesToDoc(get(url))
 			entries := doc.Find("ul.vd-list li")
 			entries.Each(func(i int, se *goquery.Selection) {
@@ -186,18 +190,18 @@ func main() {
 				title := titleSe.Text()
 				href, ok := titleSe.Attr("href")
 				if !ok || len(title) == 0 {
-					log.Fatalf("invalid entry in %s # %d", url, i)
+					panic(sp("invalid entry in %s # %d", url, i))
 				}
 				idStr := href[strings.LastIndex(href, "av")+2:]
 				idStr = idStr[:len(idStr)-1]
 				id, err := strconv.Atoi(idStr)
 				if err != nil {
-					log.Fatalf("invalid entry in %s # %d", url, i)
+					panic(sp("invalid entry in %s # %d", url, i))
 				}
 				imgSe := se.Find("a img")
 				image, ok := imgSe.Attr("src")
 				if !ok {
-					log.Fatalf("invalid entry in %s # %d", url, i)
+					panic(sp("invalid entry in %s # %d", url, i))
 				}
 				//pt("%d %s %s\n", id, title, image)
 				_, err = db.Exec(`INSERT INTO video (id, title, image, added)
@@ -205,7 +209,7 @@ func main() {
 				if err != nil {
 					if err.(pgx.PgError).Code == "23505" { // dup
 					} else {
-						log.Fatal(err)
+						panic(err)
 					}
 				}
 			})
