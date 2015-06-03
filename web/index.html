@@ -1,0 +1,85 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="bootstrap.min.css">
+    <link rel="stylesheet" href="bootstrap-theme.min.css">
+    <script src="jquery-2.1.4.min.js"></script>
+    <script src="bootstrap.min.js"></script>
+    <script src="react.js"></script>
+    <script src="jsx.js"></script>
+  </head>
+  <body>
+    <div class="container">
+      <div class="row">
+        <div class="col-sm-6" id="left">
+        </div>
+        <div class="col-sm-6" id="right">
+        </div>
+      </div>
+    </div>
+
+    <script type="text/jsx">
+var reloads = [];
+var Entries = React.createClass({
+  getInitialState: function() {
+    return {data: []};
+  },
+  loadData: function() {
+    $.ajax({
+      url: this.props.url,
+      dataType: 'json',
+      cache: false,
+      success: function(data) {
+        this.setState({data: data});
+      }.bind(this),
+      error: function(xhr, status, err) {
+        console.error(this.props.url, status, err.toString());
+      }.bind(this)
+    });
+  },
+  componentDidMount: function() {
+    this.loadData();
+    setInterval(this.loadData, 5000);
+    reloads.push(this.loadData);
+  },
+  render: function() {
+    var load = this.loadData;
+    var nodes = this.state.data.map(function(entry) {
+      var click = function() {
+        $.ajax({
+          url: 'mark?id=' + entry.id,
+          dataType: 'json',
+          cache: false,
+          success: function(data) {
+            for (var i in reloads) { reloads[i]() }
+          },
+        });
+      };
+      return (
+        <div className="entry">
+          <p>
+            <button className="btn" onClick={click}>Mark</button>
+            <a href={'go?id=' + entry.id} target="_blank">{entry.title}</a>
+          </p>
+          <img src={entry.image}></img>
+        </div>
+      );
+    });
+    return (
+      <div>{nodes}</div>
+    );
+  }
+});
+
+React.render(
+  <Entries url="newest.json"></Entries>,
+  document.getElementById("left")
+);
+React.render(
+  <Entries url="recently.json"></Entries>,
+  document.getElementById("right")
+);
+    </script>
+  </body>
+</html>
