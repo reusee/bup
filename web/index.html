@@ -22,6 +22,7 @@
           <div class="container">
             <div class="collapse navbar-collapse">
               <ul class="nav navbar-nav navbar-right">
+                <li><button class="btn btn-default navbar-btn" onClick="reload()">Refresh</button></li>
                 <li><a href="#top">Top</a></li>
               </ul>
             </div>
@@ -32,6 +33,9 @@
 
     <script type="text/jsx">
 var reloads = [];
+var reload = function() {
+  for (var i in reloads) { reloads[i]() }
+};
 var Entries = React.createClass({
   getInitialState: function() {
     return {data: []};
@@ -63,7 +67,7 @@ var Entries = React.createClass({
           dataType: 'json',
           cache: false,
           success: function(data) {
-            for (var i in reloads) { reloads[i]() }
+            reload();
           },
         });
       };
