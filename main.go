@@ -251,7 +251,7 @@ func main() {
 		videos := []Video{}
 		err := db.Select(&videos, `SELECT id, title, image FROM video 
 			WHERE last_visit IS NOT NULL
-			ORDER BY last_visit DESC LIMIT 50`)
+			ORDER BY last_visit DESC LIMIT 20`)
 		checkErr("select", err)
 		bs, err := json.Marshal(videos)
 		checkErr("marshal json", err)
