@@ -227,7 +227,7 @@ func main() {
 		}
 	}()
 
-	root := "./web"
+	root := "./react"
 	if len(os.Args) > 1 {
 		root = os.Args[1]
 	}
@@ -267,6 +267,19 @@ func main() {
 			last_visit = $2
 			WHERE id = $1`, id, time.Now().Unix())
 		http.Redirect(w, req, sp("http://www.bilibili.com/video/av%d", id), 307)
+	})
+
+	http.HandleFunc("/mark", func(w http.ResponseWriter, req *http.Request) {
+		idStr := req.FormValue("id")
+		id, err := strconv.Atoi(idStr)
+		checkErr("parse id", err)
+		db.MustExec(`UPDATE video SET 
+			view = view + 1,
+			last_visit = $2
+			WHERE id = $1`, id, time.Now().Unix())
+		bs, err := json.Marshal(struct{ Ok bool }{true})
+		checkErr("marshal json", err)
+		w.Write(bs)
 	})
 
 	pt("starting http server\n")
