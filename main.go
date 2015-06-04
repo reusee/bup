@@ -182,6 +182,8 @@ func main() {
 		urls = append(urls, sp("http://www.bilibili.com/list/damku-29-1-%s.html", rangeStr)) // 三次元音乐弹幕排序
 		urls = append(urls, sp("http://www.bilibili.com/list/damku-17-1-%s.html", rangeStr)) // 单机联机弹幕排序
 		urls = append(urls, sp("http://www.bilibili.com/list/damku-37-1-%s.html", rangeStr)) // 纪录片弹幕排序
+		urls = append(urls, sp("http://www.bilibili.com/list/damku-51-1-%s.html", rangeStr)) // 动画资讯弹幕排序
+		urls = append(urls, sp("http://www.bilibili.com/list/damku-98-1-%s.html", rangeStr)) // 机械弹幕排序
 		for _, url := range urls {
 			doc := bytesToDoc(get(url))
 			entries := doc.Find("ul.vd-list li")
@@ -240,7 +242,7 @@ func main() {
 		videos := []Video{}
 		err := db.Select(&videos, `SELECT id, title, image FROM video 
 			WHERE view < 1
-			ORDER BY added DESC, id DESC LIMIT 50`)
+			ORDER BY id DESC, added DESC LIMIT 50`)
 		checkErr("select", err)
 		bs, err := json.Marshal(videos)
 		checkErr("marshal json", err)
