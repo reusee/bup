@@ -36,7 +36,7 @@
     <entries>
       <div class="entry" each={data}>
         <p>
-          <button class="btn btn-primary btn-sm" onClick={parent.click}>Mark</button>
+          <button class="btn btn-primary btn-sm" onClick={parent.mark}>Mark</button>
           <a href={'go?id=' + id} target="_blank" class="title" onClick={parent.click}>{title}</a>
         </p>
         <img src={image} class="img-rounded img-responsive"></img>
@@ -60,7 +60,7 @@
         setInterval(self.loadData, 8000);
         el.on('update', self.loadData);
       });
-      click(event) {
+      mark(event) {
         $.ajax({
           url: 'mark?id=' + event.item.id,
           dataType: 'json',
@@ -72,6 +72,10 @@
             console.error(opts.url, status, err.toString());
           }
         });
+      };
+      click(event) {
+        self.mark(event);
+        window.open('go?id=' + event.item.id, '_blank');
       };
     </entries>
     </script>
