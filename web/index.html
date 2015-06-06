@@ -7,14 +7,7 @@
     <link rel="stylesheet" href="style.css">
     <script src="jquery-2.1.4.min.js"></script>
     <script src="bootstrap.min.js"></script>
-
     <script src="riot+compiler.min.js"></script>
-
-    <!--
-    <script src="react.js"></script>
-    <script src="jsx.js"></script>
-    -->
-
   </head>
   <body>
     <div class="container">
@@ -39,13 +32,6 @@
       </div>
     </div>
 
-    <script>
-    var reloads = [];
-    var reload = function() {
-      for (var i in reloads) { reloads[i]() }
-    };
-    </script>
-
     <script type="riot/tag">
     <entries>
       <div class="entry" each={data}>
@@ -62,8 +48,7 @@
           dataType: 'json',
           cache: false,
           success: function(data) {
-            self.data = data;
-            self.update();
+            self.update({data: data});
           }.bind(self),
           error: function(xhr, status, err) {
             console.error(opts.url, status, err.toString());
@@ -73,7 +58,7 @@
       self.on('mount', function() {
         self.loadData();
         setInterval(self.loadData, 8000);
-        reloads.push(self.loadData);
+        el.on('update', self.loadData);
       });
       click(event) {
         $.ajax({
@@ -81,7 +66,7 @@
           dataType: 'json',
           cache: false,
           success: function(data) {
-            reload();
+            el.trigger('update');
           },
           error: function(xhr, status, err) {
             console.error(opts.url, status, err.toString());
@@ -90,8 +75,8 @@
       };
     </entries>
     </script>
-
     <script>
+    var el = riot.observable({});
     riot.mount('#left', {url: "newest.json"});
     riot.mount('#right', {url: "recently.json"});
     </script>
