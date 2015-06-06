@@ -14,10 +14,10 @@
       <div class="row">
         <a name="top"></a>
         <div class="col-md-6">
-          <entries id="left"></entries>
+          <entries url="newest.json"></entries>
         </div>
         <div class="col-md-6">
-          <entries id="right"></entries>
+          <entries url="recently.json"></entries>
         </div>
         <nav class="navbar navbar-default navbar-fixed-bottom">
           <div class="container">
@@ -42,16 +42,17 @@
         <img src={image} class="img-rounded img-responsive"></img>
       </div>
       var self = this
+      var url = self.root.getAttribute('url');
       loadData() {
         $.ajax({
-          url: opts.url,
+          url: url,
           dataType: 'json',
           cache: false,
           success: function(data) {
             self.update({data: data});
           }.bind(self),
           error: function(xhr, status, err) {
-            console.error(opts.url, status, err.toString());
+            console.error(url, status, err.toString());
           }.bind(self)
         });
       };
@@ -69,7 +70,7 @@
             el.trigger('update');
           },
           error: function(xhr, status, err) {
-            console.error(opts.url, status, err.toString());
+            console.error(url, status, err.toString());
           }
         });
       };
@@ -81,8 +82,7 @@
     </script>
     <script>
     var el = riot.observable({});
-    riot.mount('#left', {url: "newest.json"});
-    riot.mount('#right', {url: "recently.json"});
+    riot.mount('*');
     </script>
 
   </body>
