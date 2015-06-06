@@ -7,16 +7,24 @@
     <link rel="stylesheet" href="style.css">
     <script src="jquery-2.1.4.min.js"></script>
     <script src="bootstrap.min.js"></script>
+
+    <script src="riot+compiler.min.js"></script>
+
+    <!--
     <script src="react.js"></script>
     <script src="jsx.js"></script>
+    -->
+
   </head>
   <body>
     <div class="container">
       <div class="row">
         <a name="top"></a>
-        <div class="col-md-6" id="left">
+        <div class="col-md-6">
+          <entries id="left"></entries>
         </div>
-        <div class="col-md-6" id="right">
+        <div class="col-md-6">
+          <entries id="right"></entries>
         </div>
         <nav class="navbar navbar-default navbar-fixed-bottom">
           <div class="container">
@@ -31,70 +39,62 @@
       </div>
     </div>
 
-    <script type="text/jsx">
-var reloads = [];
-var reload = function() {
-  for (var i in reloads) { reloads[i]() }
-};
-var Entries = React.createClass({
-  getInitialState: function() {
-    return {data: []};
-  },
-  loadData: function() {
-    $.ajax({
-      url: this.props.url,
-      dataType: 'json',
-      cache: false,
-      success: function(data) {
-        this.setState({data: data});
-      }.bind(this),
-      error: function(xhr, status, err) {
-        console.error(this.props.url, status, err.toString());
-      }.bind(this)
-    });
-  },
-  componentDidMount: function() {
-    this.loadData();
-    setInterval(this.loadData, 5000);
-    reloads.push(this.loadData);
-  },
-  render: function() {
-    var load = this.loadData;
-    var nodes = this.state.data.map(function(entry) {
-      var click = function() {
+    <script>
+    var reloads = [];
+    var reload = function() {
+      for (var i in reloads) { reloads[i]() }
+    };
+    </script>
+
+    <script type="riot/tag">
+    <entries>
+      <div class="entry" each={data}>
+        <p>
+          <button class="btn btn-primary btn-sm" onClick={parent.click}>Mark</button>
+          <a href={'go?id=' + id} target="_blank" class="title" onClick={parent.click}>{title}</a>
+        </p>
+        <img src={image} class="img-rounded img-responsive"></img>
+      </div>
+      var self = this
+      loadData() {
         $.ajax({
-          url: 'mark?id=' + entry.id,
+          url: opts.url,
+          dataType: 'json',
+          cache: false,
+          success: function(data) {
+            self.data = data;
+            self.update();
+          }.bind(self),
+          error: function(xhr, status, err) {
+            console.error(opts.url, status, err.toString());
+          }.bind(self)
+        });
+      };
+      self.on('mount', function() {
+        self.loadData();
+        setInterval(self.loadData, 8000);
+        reloads.push(self.loadData);
+      });
+      click(event) {
+        $.ajax({
+          url: 'mark?id=' + event.item.id,
           dataType: 'json',
           cache: false,
           success: function(data) {
             reload();
           },
+          error: function(xhr, status, err) {
+            console.error(opts.url, status, err.toString());
+          }
         });
       };
-      return (
-        <div className="entry">
-          <p>
-            <button className="btn btn-primary btn-sm" onClick={click}>Mark</button>
-            <a href={'go?id=' + entry.id} target="_blank" className="title" onClick={click}>{entry.title}</a>
-          </p>
-          <img src={entry.image} className="img-rounded img-responsive"></img>
-        </div>
-      );
-    });
-    return (
-      <div>{nodes}</div>
-    );
-  }
-});
-
-React.render(
-  <Entries url="newest.json"></Entries>,
-  document.getElementById("left")
-);
-React.render(
-  <Entries url="recently.json"></Entries>,
-  document.getElementById("right")
-);
+    </entries>
     </script>
+
+    <script>
+    riot.mount('#left', {url: "newest.json"});
+    riot.mount('#right', {url: "recently.json"});
+    </script>
+
   </body>
 </html>
