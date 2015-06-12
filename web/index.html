@@ -46,8 +46,9 @@
     <entries>
       <div class="entry" each={data}>
         <p>
-          <button class="btn btn-primary btn-sm" onClick={parent.mark}>Mark</button>
+          <button class="btn btn-primary btn-sm mark-button" onClick={parent.mark}>Mark</button>
           <a href={'go?id=' + id} target="_blank" class="title" onClick={parent.click}>{title}</a>
+          <div class="clearfix"></div>
         </p>
         <img src={image} class="img-rounded img-responsive"></img>
       </div>
