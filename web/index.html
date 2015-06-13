@@ -33,7 +33,7 @@
           <div class="container">
             <div class="collapse navbar-collapse">
               <ul class="nav navbar-nav navbar-right">
-                <li><button class="btn btn-default navbar-btn" onClick="el.trigger('update')">Refresh</button></li>
+                <li><button class="btn btn-primary navbar-btn" id="refresh-button" onClick="el.trigger('update')">Refresh</button></li>
                 <li><a href="#top">Top</a></li>
               </ul>
             </div>
@@ -54,16 +54,20 @@
       </div>
       var self = this
       var url = self.root.getAttribute('url');
+      var refreshButton = $('#refresh-button');
       loadData() {
+        refreshButton.attr('disabled', 'disabled');
         $.ajax({
           url: url,
           dataType: 'json',
           cache: false,
           success: function(data) {
             self.update({data: data});
+            refreshButton.removeAttr('disabled');
           }.bind(self),
           error: function(xhr, status, err) {
             console.error(url, status, err.toString());
+            refreshButton.removeAttr('disabled');
           }.bind(self)
         });
       };
