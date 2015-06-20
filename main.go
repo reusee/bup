@@ -141,8 +141,8 @@ func main() {
 			if !ok {
 				panic("no image")
 			}
-			_, err = db.Exec(`INSERT IGNORE INTO video (id, title, image, added, uid) 
-				VALUES (?, ?, ?, ?, ?)`, id, title, image, time.Now().Unix(), uid)
+			_, err = db.Exec(`INSERT INTO video (id, title, image, added, uid) 
+				VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE id=id`, id, title, image, time.Now().Unix(), uid)
 			ce(err, "insert")
 			count++
 		})
@@ -200,8 +200,8 @@ func main() {
 					panic(sp("invalid entry in %s # %d", url, i))
 				}
 				//pt("%d %s %s\n", id, title, image)
-				_, err = db.Exec(`INSERT IGNORE INTO video (id, title, image, added)
-					VALUES (?, ?, ?, ?)`, id, title, image, time.Now().Unix())
+				_, err = db.Exec(`INSERT INTO video (id, title, image, added)
+					VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE id=id`, id, title, image, time.Now().Unix())
 				ce(err, "insert")
 			})
 		}
@@ -268,7 +268,7 @@ func main() {
 		_, err = db.Exec(`UPDATE video SET
 			view = view + 1,
 			last_visit = ?
-			WHERE id = ?`, id, time.Now().Unix())
+			WHERE id = ?`, time.Now().Unix(), id)
 		ce(err, "update")
 		http.Redirect(w, req, sp("http://www.bilibili.com/video/av%d", id), 307)
 	})
@@ -280,7 +280,7 @@ func main() {
 		_, err = db.Exec(`UPDATE video SET 
 			view = view + 1,
 			last_visit = ?
-			WHERE id = ?`, id, time.Now().Unix())
+			WHERE id = ?`, time.Now().Unix(), id)
 		ce(err, "update")
 		bs, err := json.Marshal(struct{ Ok bool }{true})
 		ce(err, "marshal json")
