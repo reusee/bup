@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -15,17 +16,19 @@ import (
 
 	_ "net/http/pprof"
 
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/reusee/catch"
+
 	"github.com/PuerkitoBio/goquery"
 	"github.com/bradfitz/http2"
-	"github.com/jackc/pgx"
-	_ "github.com/jackc/pgx/stdlib"
-	"github.com/jmoiron/sqlx"
 )
 
 var (
 	pt          = fmt.Printf
 	sp          = fmt.Sprintf
 	logFilePath = flag.String("log", "", "log file path")
+	ce          = catch.PkgChecker("bilibili")
+	ct          = catch.Catch
 )
 
 func main() {
@@ -36,16 +39,19 @@ func main() {
 		}
 	}()
 
-	checkErr := func(msg string, err error) {
-		if err != nil {
-			panic(sp("%s error: %v", msg, err))
-		}
-	}
+	db, err := sql.Open("mysql", "root@unix(/var/run/mysqld/mysqld.sock)/bilibili?tokudb_commit_sync=off")
+	ce(err, "connect to db")
 
-	db, err := sqlx.Connect("pgx", "postgres://reus@localhost/bilibili")
-	checkErr("connect to psql", err)
-	err = db.Ping()
-	checkErr("ping database", err)
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS video (
+		id INTEGER PRIMARY KEY,
+		title TEXT,
+		view INTEGER NOT NULL DEFAULT 0,
+		last_visit INTEGER,
+		image TEXT,
+		added INTEGER DEFAULT 0,
+		uid CHAR(64)
+		) engine=TokuDB`)
+	ce(err, "create table")
 
 	get := func(url string) []byte {
 		retryCount := 8
@@ -61,7 +67,7 @@ func main() {
 				time.Sleep(time.Second * 3)
 				goto retry
 			} else {
-				checkErr(sp("get %s", url), err)
+				ce(err, sp("get %s", url))
 			}
 		}
 		defer resp.Body.Close()
@@ -72,7 +78,7 @@ func main() {
 				time.Sleep(time.Second * 3)
 				goto retry
 			} else {
-				checkErr(sp("read %s", url), err)
+				ce(err, sp("read %s", url))
 			}
 		}
 		return content
@@ -80,7 +86,7 @@ func main() {
 
 	bytesToDoc := func(bs []byte) *goquery.Document {
 		doc, err := goquery.NewDocumentFromReader(bytes.NewReader(bs))
-		checkErr("get document", err)
+		ce(err, "get document")
 		return doc
 	}
 
@@ -115,12 +121,11 @@ func main() {
 		return users
 	}
 
-	collectVideo := func(uid string, page int) (int, int) {
+	collectVideo := func(uid string, page int) int {
 		url := sp("http://space.bilibili.com/space?uid=%s&page=%d", uid, page)
 		doc := bytesToDoc(get(url))
 		entries := doc.Find("div.main_list ul li")
 		count := 0
-		dup := 0
 		entries.Each(func(n int, se *goquery.Selection) {
 			titleSe := se.Find("a.title")
 			title := titleSe.Text()
@@ -136,18 +141,12 @@ func main() {
 			if !ok {
 				panic("no image")
 			}
-			_, err = db.Exec(`INSERT INTO video (id, title, image, added, uid) 
-				VALUES ($1, $2, $3, $4, $5)`, id, title, image, time.Now().Unix(), uid)
-			if err != nil {
-				if err.(pgx.PgError).Code == "23505" { // dup
-					dup++
-				} else {
-					panic(err)
-				}
-			}
+			_, err = db.Exec(`INSERT IGNORE INTO video (id, title, image, added, uid) 
+				VALUES (?, ?, ?, ?, ?)`, id, title, image, time.Now().Unix(), uid)
+			ce(err, "insert")
 			count++
 		})
-		return count, dup
+		return count
 	}
 
 	collectFollowed := func() {
@@ -155,14 +154,9 @@ func main() {
 		users := collectFollowers()
 		for _, uid := range users {
 			page := 1
-			totalDup := 0
-			for {
-				count, dup := collectVideo(uid, page)
+			for page < 50 {
+				count := collectVideo(uid, page)
 				if count == 0 {
-					break
-				}
-				totalDup += dup
-				if totalDup > 50 {
 					break
 				}
 				page++
@@ -206,14 +200,9 @@ func main() {
 					panic(sp("invalid entry in %s # %d", url, i))
 				}
 				//pt("%d %s %s\n", id, title, image)
-				_, err = db.Exec(`INSERT INTO video (id, title, image, added)
-					VALUES ($1, $2, $3, $4)`, id, title, image, time.Now().Unix())
-				if err != nil {
-					if err.(pgx.PgError).Code == "23505" { // dup
-					} else {
-						panic(err)
-					}
-				}
+				_, err = db.Exec(`INSERT IGNORE INTO video (id, title, image, added)
+					VALUES (?, ?, ?, ?)`, id, title, image, time.Now().Unix())
+				ce(err, "insert")
 			})
 		}
 	}
@@ -229,58 +218,72 @@ func main() {
 		}
 	}()
 
-	root := "./react"
+	root := "./web"
 	if len(os.Args) > 1 {
 		root = os.Args[1]
 	}
 	root, err = filepath.Abs(root)
-	checkErr("get web root dir", err)
+	ce(err, "get web root dir")
 	pt("web root %s\n", root)
 	http.Handle("/", http.FileServer(http.Dir(root)))
 
 	http.HandleFunc("/newest.json", func(w http.ResponseWriter, req *http.Request) {
 		videos := []Video{}
-		err := db.Select(&videos, `SELECT id, title, image FROM video 
+		rows, err := db.Query(`SELECT id, title, image FROM video 
 			WHERE view < 1
 			ORDER BY id DESC, added DESC LIMIT 50`)
-		checkErr("select", err)
+		ce(err, "query")
+		for rows.Next() {
+			var video Video
+			ce(rows.Scan(&video.Id, &video.Title, &video.Image), "scan")
+			videos = append(videos, video)
+		}
+		ce(rows.Err(), "rows")
 		bs, err := json.Marshal(videos)
-		checkErr("marshal json", err)
+		ce(err, "marshal")
 		w.Write(bs)
 	})
 
 	http.HandleFunc("/recently.json", func(w http.ResponseWriter, req *http.Request) {
 		videos := []Video{}
-		err := db.Select(&videos, `SELECT id, title, image FROM video 
+		rows, err := db.Query(`SELECT id, title, image FROM video 
 			WHERE last_visit IS NOT NULL
 			ORDER BY last_visit DESC LIMIT 20`)
-		checkErr("select", err)
+		ce(err, "query")
+		for rows.Next() {
+			var video Video
+			ce(rows.Scan(&video.Id, &video.Title, &video.Image), "scan")
+			videos = append(videos, video)
+		}
+		ce(rows.Err(), "rows")
 		bs, err := json.Marshal(videos)
-		checkErr("marshal json", err)
+		ce(err, "marshal")
 		w.Write(bs)
 	})
 
 	http.HandleFunc("/go", func(w http.ResponseWriter, req *http.Request) {
 		idStr := req.FormValue("id")
 		id, err := strconv.Atoi(idStr)
-		checkErr("parse id", err)
-		db.MustExec(`UPDATE video SET 
+		ce(err, "parse id")
+		_, err = db.Exec(`UPDATE video SET
 			view = view + 1,
-			last_visit = $2
-			WHERE id = $1`, id, time.Now().Unix())
+			last_visit = ?
+			WHERE id = ?`, id, time.Now().Unix())
+		ce(err, "update")
 		http.Redirect(w, req, sp("http://www.bilibili.com/video/av%d", id), 307)
 	})
 
 	http.HandleFunc("/mark", func(w http.ResponseWriter, req *http.Request) {
 		idStr := req.FormValue("id")
 		id, err := strconv.Atoi(idStr)
-		checkErr("parse id", err)
-		db.MustExec(`UPDATE video SET 
+		ce(err, "parse id")
+		_, err = db.Exec(`UPDATE video SET 
 			view = view + 1,
-			last_visit = $2
-			WHERE id = $1`, id, time.Now().Unix())
+			last_visit = ?
+			WHERE id = ?`, id, time.Now().Unix())
+		ce(err, "update")
 		bs, err := json.Marshal(struct{ Ok bool }{true})
-		checkErr("marshal json", err)
+		ce(err, "marshal json")
 		w.Write(bs)
 	})
 
@@ -290,7 +293,7 @@ func main() {
 	}
 	http2.ConfigureServer(&server, nil)
 	err = server.ListenAndServe()
-	checkErr("start http server", err)
+	ce(err, "start http server")
 }
 
 type Video struct {
