@@ -90,77 +90,69 @@ func main() {
 		return doc
 	}
 
-	collectFollowers := func() []string {
-
-	getMaxPage:
-		doc := bytesToDoc(get("http://space.bilibili.com/19415/follow.html?page=1"))
-		maxPage := doc.Find("ul.page li").Length()
-		if maxPage == 0 {
-			goto getMaxPage
-		}
-		users := []string{}
-		collectUser := func(url string) {
-		getDoc:
-			doc := bytesToDoc(get(url))
-			entries := doc.Find("div.fanslist ul li div.t a[card]")
-			if entries.Length() == 0 {
-				goto getDoc
-			}
-			entries.Each(func(n int, se *goquery.Selection) {
-				href, ok := se.Attr("href")
-				if !ok {
-					panic("invalid entry")
+	collectFollowers := func() []int {
+		uids := []int{}
+		page := 1
+	collect:
+		jsn := get(sp("http://space.bilibili.com/ajax/friend/GetAttentionList?mid=19415&page=%d", page))
+		var data struct {
+			Status bool
+			Data   struct {
+				Pages   int
+				Results int
+				List    []struct {
+					Fid int
 				}
-				uid := href[strings.LastIndex(href, "/")+1:]
-				users = append(users, uid)
-			})
+			}
 		}
-		for i := 1; i <= maxPage; i++ {
-			collectUser(sp("http://space.bilibili.com/19415/follow.html?page=%d", i))
+		err := json.NewDecoder(bytes.NewReader(jsn)).Decode(&data)
+		ce(err, "decode following list")
+		for _, u := range data.Data.List {
+			uids = append(uids, u.Fid)
 		}
-		return users
+		page++
+		if page <= data.Data.Pages {
+			goto collect
+		}
+		pt("following %d users\n", len(uids))
+		return uids
 	}
 
-	collectVideo := func(uid string, page int) int {
-		url := sp("http://space.bilibili.com/space?uid=%s&page=%d", uid, page)
-		doc := bytesToDoc(get(url))
-		entries := doc.Find("div.main_list ul li")
-		count := 0
-		entries.Each(func(n int, se *goquery.Selection) {
-			titleSe := se.Find("a.title")
-			title := titleSe.Text()
-			href, ok := titleSe.Attr("href")
-			if !ok || len(title) == 0 {
-				panic("invalid entry")
+	collectVideo := func(uid int) {
+		page := 1
+	collect:
+		jsn := get(sp(
+			"http://space.bilibili.com/ajax/member/getSubmitVideos?mid=%d&page=%d",
+			uid, page))
+		var data struct {
+			Status bool
+			Data   struct {
+				Pages int
+				List  []struct {
+					Aid   string
+					Title string
+					Pic   string
+				}
 			}
-			idStr := href[strings.LastIndex(href, "av")+2:]
-			idStr = idStr[:len(idStr)-1]
-			id, err := strconv.Atoi(idStr)
-			imgSe := se.Find("a img")
-			image, ok := imgSe.Attr("src")
-			if !ok {
-				panic("no image")
-			}
-			_, err = db.Exec(`INSERT INTO video (id, title, image, added, uid) 
-				VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE id=id`, id, title, image, time.Now().Unix(), uid)
-			ce(err, "insert")
-			count++
-		})
-		return count
+		}
+		err := json.NewDecoder(bytes.NewReader(jsn)).Decode(&data)
+		ce(err, "decode user video list")
+		for _, v := range data.Data.List {
+			_, err = db.Exec(`INSERT INTO video (id, title, image, added, uid)
+					VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE id=id`,
+				v.Aid, v.Title, v.Pic, time.Now().Unix(), uid)
+		}
+		page++
+		if page <= data.Data.Pages && page < 30 {
+			goto collect
+		}
 	}
 
 	collectFollowed := func() {
 		t0 := time.Now()
 		users := collectFollowers()
 		for _, uid := range users {
-			page := 1
-			for page < 50 {
-				count := collectVideo(uid, page)
-				if count == 0 {
-					break
-				}
-				page++
-			}
+			collectVideo(uid)
 		}
 		pt("collected in %v\n", time.Now().Sub(t0))
 	}
