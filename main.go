@@ -90,28 +90,35 @@ func main() {
 		return doc
 	}
 
-	collectFollowers := func() []int {
-		uids := []int{}
+	collectFollowers := func() (uids []int) {
 		page := 1
 	collect:
 		jsn := get(sp("http://space.bilibili.com/ajax/friend/GetAttentionList?mid=19415&page=%d", page))
 		var data struct {
 			Status bool
-			Data   struct {
-				Pages   int
-				Results int
-				List    []struct {
-					Fid int
-				}
-			}
+			Data   json.RawMessage
 		}
 		err := json.NewDecoder(bytes.NewReader(jsn)).Decode(&data)
 		ce(err, "decode following list")
-		for _, u := range data.Data.List {
+		if !data.Status {
+			pt("json error %s\n", data.Data)
+			//goto collect
+			return
+		}
+		var data2 struct {
+			Pages   int
+			Results int
+			List    []struct {
+				Fid int
+			}
+		}
+		err = json.NewDecoder(bytes.NewReader(data.Data)).Decode(&data2)
+		ce(err, "decode following list")
+		for _, u := range data2.List {
 			uids = append(uids, u.Fid)
 		}
 		page++
-		if page <= data.Data.Pages {
+		if page <= data2.Pages {
 			goto collect
 		}
 		pt("following %d users\n", len(uids))
@@ -203,10 +210,10 @@ func main() {
 		for {
 			func() {
 				defer recover()
-				collectHottest()
 				collectFollowed()
+				collectHottest()
 			}()
-			time.Sleep(time.Minute * 5)
+			time.Sleep(time.Minute * 30)
 		}
 	}()
 
