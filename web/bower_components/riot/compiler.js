@@ -1,5 +1,15 @@
-;(function(window) {
-riot.parsers = {
+(function (root, factory) {
+    /* istanbul ignore next */
+    if (typeof define === 'function' && define.amd)
+      define(['riot'], factory)
+    else if (typeof exports === 'object')
+      factory(require('riot'))
+    else factory(root.riot)
+}(this, function (riot, undefined) {
+
+  var T_STRING = 'string'
+/* istanbul ignore next */
+var parsers = {
   html: {},
   css: {},
   js: {
@@ -14,6 +24,13 @@ riot.parsers = {
     }
   }
 }
+
+// fix 913
+parsers.js.javascript = parsers.js.none
+// 4 the nostalgics
+parsers.js.coffeescript = parsers.js.coffee
+
+riot.parsers = parsers
 
 
 var BOOL_ATTR = ('allowfullscreen,async,autofocus,autoplay,checked,compact,controls,declare,default,'+
@@ -32,7 +49,7 @@ var BOOL_ATTR = ('allowfullscreen,async,autofocus,autoplay,checked,compact,contr
   PREFIX_ATTR = ['style', 'src', 'd'],
 
   LINE_TAG = /^<([\w\-]+)>(.*)<\/\1>/gim,
-  QUOTE = /=({[^}]+})([\s\/\>])/g,
+  QUOTE = /=({[^}]+})([\s\/\>]|$)/g,
   SET_ATTR = /([\w\-]+)=(["'])([^\2]+?)\2/g,
   EXPR = /{\s*([^}]+)\s*}/g,
   // (tagname) (html) (javascript) endtag
@@ -44,7 +61,8 @@ var BOOL_ATTR = ('allowfullscreen,async,autofocus,autoplay,checked,compact,contr
   HTML_COMMENT = /<!--.*?-->/g,
   CLOSED_TAG = /<([\w\-]+)([^>]*)\/\s*>/g,
   LINE_COMMENT = /^\s*\/\/.*$/gm,
-  JS_COMMENT = /\/\*[^\x00]*?\*\//gm
+  JS_COMMENT = /\/\*[^\x00]*?\*\//gm,
+  INPUT_NUMBER = /(<input\s[^>]*?)type=['"]number['"]/gm
 
 function mktag(name, html, css, attrs, js) {
   return 'riot.tag(\''
@@ -67,6 +85,9 @@ function compileHTML(html, opts, type) {
 
   // strip comments
   html = html.trim().replace(HTML_COMMENT, '')
+
+  // input type=numbr
+  html = html.replace(INPUT_NUMBER, '$1riot-type='+brackets(0)+'"number"'+brackets(1)) // fake expression
 
   // alter special attribute names
   html = html.replace(SET_ATTR, function(full, name, _, expr) {
@@ -127,11 +148,11 @@ function riotjs(js) {
     var l = line.trim()
 
     // method start
-    if (l[0] != '}' && l.indexOf('(') > 0 && l.indexOf('function') == -1) {
-      var end = /[{}]/.exec(l.slice(-1)),
-          m = end && /(\s+)([\w]+)\s*\(([\w,\s]*)\)\s*\{/.exec(line)
+    if (l[0] != '}' && ~l.indexOf('(')) {
+      var end = l.match(/[{}]$/),
+          m = end && line.match(/^(\s+)([$\w]+)\s*\(([$\w,\s]*)\)\s*\{/)
 
-      if (m && !/^(if|while|switch|for)$/.test(m[2])) {
+      if (m && !/^(if|while|switch|for|catch|function)$/.test(m[2])) {
         lines[i] = m[1] + 'this.' + m[2] + ' = function(' + m[3] + ') {'
 
         // foo() { }
@@ -158,10 +179,16 @@ function riotjs(js) {
 }
 
 function scopedCSS (tag, style, type) {
+  // 1. Remove CSS comments
+  // 2. Find selectors and separate them by conmma
+  // 3. keep special selectors as is
+  // 4. prepend tag and [riot-tag]
   return style.replace(CSS_COMMENT, '').replace(CSS_SELECTOR, function (m, p1, p2) {
     return p1 + ' ' + p2.split(/\s*,\s*/g).map(function(sel) {
-      var s = sel.replace(/:scope\s*/, '')
-      return sel[0] == '@' ? sel : tag + ' ' + s +', [riot-tag="'+tag+'"] ' + s
+      var s = sel.trim()
+      var t = (/:scope/.test(s) ? '' : ' ') + s.replace(/:scope/, '')
+      return s[0] == '@' || s == 'from' || s == 'to' || /%$/.test(s) ? s :
+        tag + t + ', [riot-tag="' + tag + '"]' + t
     }).join(',')
   }).trim()
 }
@@ -197,8 +224,8 @@ function compile(src, opts) {
   })
 
   return src.replace(CUSTOM_TAG, function(_, tagName, attrs, html, js) {
-
     html = html || ''
+    attrs = compileHTML(attrs, '', '')
 
     // js wrapped inside <script> tag
     var type = opts.type
@@ -216,7 +243,7 @@ function compile(src, opts) {
         style = ''
 
     html = html.replace(STYLE, function(_, fullType, _type, _style) {
-      if (fullType && 'scoped' == fullType.trim()) styleType = 'scoped-css'
+      if (fullType && fullType.trim() == 'scoped') styleType = 'scoped-css'
         else if (_type) styleType = _type.replace('text/', '')
       style = _style
       return ''
@@ -242,7 +269,8 @@ function GET(url, fn) {
   var req = new XMLHttpRequest()
 
   req.onreadystatechange = function() {
-    if (req.readyState == 4 && req.status == 200) fn(req.responseText)
+    if (req.readyState == 4 && (req.status == 200 || (!req.status && req.responseText.length)))
+      fn(req.responseText)
   }
   req.open('GET', url, true)
   req.send('')
@@ -273,10 +301,10 @@ function compileScripts(fn) {
     fn && fn()
   }
 
-  if(!scriptsAmount) {
+  if (!scriptsAmount) {
     done()
   } else {
-    ;[].map.call(scripts, function(script) {
+    [].map.call(scripts, function(script) {
       var url = script.getAttribute('src')
 
       function compileTag(source) {
@@ -296,7 +324,7 @@ function compileScripts(fn) {
 riot.compile = function(arg, fn) {
 
   // string
-  if (typeof arg == 'string') {
+  if (typeof arg === T_STRING) {
 
     // compile & return
     if (arg.trim()[0] == '<') {
@@ -315,7 +343,7 @@ riot.compile = function(arg, fn) {
   }
 
   // must be a function
-  if (typeof arg != 'function') arg = undefined
+  if (typeof arg !== 'function') arg = undefined
 
   // all compiled
   if (ready) return arg && arg()
@@ -343,4 +371,4 @@ riot.mount = function(a, b, c) {
 
 // @deprecated
 riot.mountTo = riot.mount
-})(this)
+}));
