@@ -1,5 +1,7 @@
 package main
 
+//go:generate myccg err bilibili -o err.go
+
 import (
 	"bytes"
 	"database/sql"
@@ -7,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -17,25 +20,37 @@ import (
 	_ "net/http/pprof"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/reusee/catch"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/bradfitz/http2"
 )
 
 var (
-	pt          = fmt.Printf
+	logger      *log.Logger
 	sp          = fmt.Sprintf
 	logFilePath = flag.String("log", "", "log file path")
-	ce          = catch.PkgChecker("bilibili")
-	ct          = catch.Catch
+	rootPath    = flag.String("root", "", "root path")
 )
 
-func main() {
+func pt(format string, args ...interface{}) {
+	logger.Printf(format, args...)
+}
+
+func init() {
 	flag.Parse()
+	if *logFilePath == "" {
+		logger = log.New(os.Stdout, "", log.LstdFlags)
+	} else {
+		logFile, err := os.OpenFile(*logFilePath, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644)
+		ce(err, "open log file")
+		logger = log.New(logFile, "", log.LstdFlags)
+	}
+}
+
+func main() {
 	defer func() {
-		if p := recover(); p != nil && *logFilePath != "" {
-			ioutil.WriteFile(*logFilePath, []byte(fmt.Sprintf("%v", p)), 0644)
+		if p := recover(); p != nil {
+			pt("%v\n", p)
 		}
 	}()
 
@@ -167,6 +182,7 @@ func main() {
 	collectHottest := func() {
 		urls := []string{
 			"http://www.bilibili.com/video/bagumi_offical_1.html#!order=hot&page=1", // 官方延伸所有新投稿
+			"http://www.bilibili.com/video/tech-popular-science-1.html",             // 所有纪录片
 		}
 		end := time.Now()
 		start := end.AddDate(0, 0, -7)
@@ -213,15 +229,11 @@ func main() {
 				collectFollowed()
 				collectHottest()
 			}()
-			time.Sleep(time.Minute * 30)
+			time.Sleep(time.Minute * 10)
 		}
 	}()
 
-	root := "./web"
-	if len(os.Args) > 1 {
-		root = os.Args[1]
-	}
-	root, err = filepath.Abs(root)
+	root, err := filepath.Abs(*rootPath)
 	ce(err, "get web root dir")
 	pt("web root %s\n", root)
 	http.Handle("/", http.FileServer(http.Dir(root)))
